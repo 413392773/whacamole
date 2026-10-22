@@ -24,6 +24,10 @@ function advanceMole(mole: Mole, now: number, stayMs: number): Mole {
   return mole
 }
 
+function pickIndex(length: number, random: () => number): number {
+  return Math.min(Math.floor(random() * length), length - 1)
+}
+
 function pickFreeHole(moles: readonly Mole[], holeCount: number, random: () => number): number | null {
   const occupied = new Set(moles.map((mole) => mole.holeIndex))
   const free: number[] = []
@@ -31,7 +35,7 @@ function pickFreeHole(moles: readonly Mole[], holeCount: number, random: () => n
     if (!occupied.has(index)) free.push(index)
   }
   if (free.length === 0) return null
-  return free[Math.floor(random() * free.length)]
+  return free[pickIndex(free.length, random)]
 }
 
 export function tickSpawns(
@@ -65,7 +69,7 @@ export function tickSpawns(
     if (activeCount < maxSimultaneous && profiles.length > 0) {
       const holeIndex = pickFreeHole(moles, holeCount, random)
       if (holeIndex !== null) {
-        const profile = profiles[Math.floor(random() * profiles.length)]
+        const profile = profiles[pickIndex(profiles.length, random)]
         moles = [
           ...moles,
           { id: moleIdSeq, holeIndex, profileId: profile.id, state: 'rising', spawnedAt: now },
@@ -75,6 +79,10 @@ export function tickSpawns(
       }
     }
     nextSpawnAt += level.spawnIntervalMs
+  }
+  // 防洪水护栏：因触顶退出且仍积压时丢弃积压，避免后续 tick 持续补冒
+  if (steps >= MAX_SPAWN_STEPS_PER_TICK && nextSpawnAt <= now) {
+    nextSpawnAt = now + level.spawnIntervalMs
   }
 
   return {

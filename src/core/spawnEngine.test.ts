@@ -66,4 +66,48 @@ test('随机函数决定洞位与档案，可复现', () => {
 test('单 tick 时间跨度大时补冒出有上限，不会死循环', () => {
   const s = tick(emptySnapshot(0), 60_000, 2)
   expect(s.moles.length).toBeLessThanOrEqual(12)
+  expect(s.spawned).toBeLessThanOrEqual(2)
+  expect(s.nextSpawnAt).toBeGreaterThan(60_000)
+})
+
+test('触顶丢弃积压后，后续 tick 不再补冒洪水', () => {
+  const s = tick(emptySnapshot(0), 60_000, 2)
+  expect(s.nextSpawnAt).toBe(60_000 + LEVEL.spawnIntervalMs)
+  const s2 = tick(s, 60_100, 2)
+  expect(s2.spawned).toBe(s.spawned)
+  expect(s2.moles).toHaveLength(s.moles.length)
+})
+
+test('elapsed 恰好等于 RISE_DURATION_MS 时转为 up', () => {
+  const s0 = tick(emptySnapshot(0), 0)
+  const s1 = tick(s0, RISE_DURATION_MS)
+  expect(s1.moles.find((m) => m.id === s0.moles[0].id)?.state).toBe('up')
+})
+
+test('elapsed 恰好等于 stayMs 时转为 escaped 并计入 misses', () => {
+  const s0 = tick(emptySnapshot(0), 0)
+  const s1 = tick(s0, LEVEL.stayMs)
+  expect(s1.moles.find((m) => m.id === s0.moles[0].id)?.state).toBe('escaped')
+  expect(s1.misses).toBe(1)
+})
+
+test('now - resolvedAt 恰好等于 RESOLVE_DELAY_MS 时被移除', () => {
+  const s0 = tick(emptySnapshot(0), 0)
+  const s1 = tick(s0, LEVEL.stayMs)
+  const s2 = tick(s1, LEVEL.stayMs + RESOLVE_DELAY_MS)
+  expect(s2.moles.find((m) => m.id === s0.moles[0].id)).toBeUndefined()
+})
+
+test('profiles 为空时不冒头也不崩溃', () => {
+  const s = tickSpawns(emptySnapshot(0), 0, LEVEL, 2, 12, [], random)
+  expect(s.moles).toHaveLength(0)
+  expect(s.spawned).toBe(0)
+  expect(s.nextSpawnAt).toBe(500)
+})
+
+test('random 返回 1 时索引 clamp 不越界', () => {
+  const s = tickSpawns(emptySnapshot(0), 0, LEVEL, 2, 12, PROFILES, () => 1)
+  expect(s.moles).toHaveLength(1)
+  expect(s.moles[0].holeIndex).toBe(11)
+  expect(s.moles[0].profileId).toBe('p2')
 })
