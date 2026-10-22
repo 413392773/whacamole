@@ -6,7 +6,7 @@ function getContext(): AudioContext | null {
   if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return null
   try {
     if (audioCtx === null) audioCtx = new AudioContext()
-    if (audioCtx.state === 'suspended') void audioCtx.resume()
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {})
     return audioCtx
   } catch {
     return null

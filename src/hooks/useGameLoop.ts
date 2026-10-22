@@ -7,8 +7,9 @@ export function useGameLoop(active: boolean, dispatch: Dispatch<Action>): void {
     if (!active) return
     let frame = 0
     const loop = () => {
-      dispatch({ type: 'TICK', now: performance.now() })
+      // 先排下一帧再 dispatch：即使 dispatch 抛异常，循环也不会静默死亡
       frame = requestAnimationFrame(loop)
+      dispatch({ type: 'TICK', now: performance.now() })
     }
     frame = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frame)
