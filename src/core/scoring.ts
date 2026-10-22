@@ -1,9 +1,13 @@
+export const BASE_HIT_SCORE = 10
+export const COMBO_BONUS_STEP = 5
+export const COMBO_THRESHOLD = 3
+
 export function comboBonus(combo: number): number {
-  return combo >= 3 ? 5 * (combo - 2) : 0
+  return combo >= COMBO_THRESHOLD ? COMBO_BONUS_STEP * (combo - (COMBO_THRESHOLD - 1)) : 0
 }
 
 export function hitScore(level: number, combo: number): number {
-  return 10 * level + comboBonus(combo)
+  return BASE_HIT_SCORE * level + comboBonus(combo)
 }
 
 export function accuracy(hits: number, spawned: number): number {
