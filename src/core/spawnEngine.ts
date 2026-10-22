@@ -2,9 +2,10 @@ import type { LevelConfig, Mole, MoleProfile } from './types'
 
 export const RISE_DURATION_MS = 150
 export const RESOLVE_DELAY_MS = 300
-// 公平性护栏：地鼠从冒出到关卡结束至少需要的反应窗口（毫秒），
-// 晚于 deadline（关卡结束 - MIN_REACTION_MS）的冒出计划不再执行，
-// 避免终局"幽灵地鼠"零反应时间必漏、稀释命中率
+// 公平性护栏：计划冒出时刻须距关卡结束至少 MIN_REACTION_MS（毫秒），
+// 晚于 deadline（关卡结束 - MIN_REACTION_MS）的冒出计划不再执行；
+// tick 迟到（now 已越过 deadline，如后台节流）时同样不补冒，
+// 避免终局"幽灵地鼠"反应时间不足必漏、稀释命中率
 export const MIN_REACTION_MS = 300
 const MAX_SPAWN_STEPS_PER_TICK = 50
 
@@ -66,7 +67,13 @@ export function tickSpawns(
   let spawned = snapshot.spawned
   let moles = current
   let steps = 0
-  while (nextSpawnAt <= now && nextSpawnAt <= spawnDeadline && steps < MAX_SPAWN_STEPS_PER_TICK) {
+  // now <= spawnDeadline：tick 迟到（后台节流等）时即便计划时刻合法也不冒出
+  while (
+    nextSpawnAt <= now &&
+    nextSpawnAt <= spawnDeadline &&
+    now <= spawnDeadline &&
+    steps < MAX_SPAWN_STEPS_PER_TICK
+  ) {
     steps += 1
     const activeCount = moles.filter(
       (mole) => mole.state === 'rising' || mole.state === 'up',

@@ -42,6 +42,8 @@ test('倒计时中途卸载后不再派发 BEGIN_LEVEL', () => {
   act(() => { vi.advanceTimersByTime(1000) })
   expect(screen.getByText('2')).toBeInTheDocument()
   unmount()
+  // cleanup 必须真正 clearTimeout：卸载后不留任何待执行定时器
+  expect(vi.getTimerCount()).toBe(0)
   // 卸载后推进超过剩余倒计时：定时器应已被 cleanup 清除，无派发、无 act 警告
   act(() => { vi.advanceTimersByTime(5000) })
   expect(dispatch).not.toHaveBeenCalled()

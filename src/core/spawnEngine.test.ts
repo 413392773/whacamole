@@ -116,11 +116,19 @@ test('nextSpawnAt 晚于 spawnDeadline 时不冒新地鼠，已有地鼠仍正�
   expect(s1.misses).toBe(1)
 })
 
-test('nextSpawnAt 恰好等于 spawnDeadline 时照常冒出（边界含等号）', () => {
-  const s0 = tick(emptySnapshot(0), 0)
-  const s1 = tickSpawns(s0, 700, LEVEL, 2, 12, PROFILES, random, 500)
+test('nextSpawnAt 恰好等于 spawnDeadline 且 now 未越线时照常冒出（边界含等号）', () => {
+  const s0 = tick(emptySnapshot(0), 0) // nextSpawnAt=500
+  const s1 = tickSpawns(s0, 500, LEVEL, 2, 12, PROFILES, random, 500)
   expect(s1.spawned).toBe(2)
   expect(s1.nextSpawnAt).toBe(1000)
+})
+
+test('now 已越过 spawnDeadline 时即便 nextSpawnAt 合法也不冒出（tick 迟到护栏）', () => {
+  const s0 = tick(emptySnapshot(0), 0) // nextSpawnAt=500 ≤ deadline=500
+  const s1 = tickSpawns(s0, 700, LEVEL, 2, 12, PROFILES, random, 500)
+  expect(s1.spawned).toBe(1)
+  expect(s1.nextSpawnAt).toBe(500)
+  expect(s1.moles).toHaveLength(1)
 })
 
 test('random 返回 1 时索引 clamp 不越界', () => {

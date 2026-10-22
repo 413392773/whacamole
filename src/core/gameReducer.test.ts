@@ -70,12 +70,22 @@ test('WHIFF 清空 combo，不影响分数', () => {
 
 test('倒计时结束达标：进入结算页，clearedLevels+1，总分累计', () => {
   let s = playing(0, 0)
-  // 构造确定性残局：预置 5 中/5 冒；nextSpawnAt 在护栏 deadline（durationMs-300）之前，
-  // 终局 tick 正常再冒 1 只不敲（有 ≥300ms 反应窗口）→ 命中率 5/6 ≥ 30%
+  // 构造确定性残局：预置 5 中/6 冒且场上 1 只未解决地鼠；终局 tick 的 now 已越过
+  // 护栏 deadline（durationMs-300，计划冒出时刻须距关卡结束 ≥300ms）不补冒，
+  // 未解决地鼠由 finishLevel 计入漏敲 → 命中率 5/6 ≥ 30%
   s = {
     ...s,
     nextSpawnAt: LEVELS[0].durationMs - 500,
-    stats: { ...s.stats, hits: 5, spawned: 5, score: 50 },
+    moles: [
+      {
+        id: 99,
+        holeIndex: 0,
+        profileId: 'builtin-0',
+        state: 'up',
+        spawnedAt: LEVELS[0].durationMs - 500,
+      },
+    ],
+    stats: { ...s.stats, hits: 5, spawned: 6, score: 50 },
   }
   s = reduce(s, { type: 'TICK', now: LEVELS[0].durationMs })
   expect(s.screen).toBe('result')
