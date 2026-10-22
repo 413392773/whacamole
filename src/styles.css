@@ -130,13 +130,16 @@ input[type='text'] {
   width: 78%; height: 86%; overflow: hidden; pointer-events: none;
 }
 .mole {
-  position: absolute; bottom: -100%; left: 0; right: 0; height: 100%;
+  position: absolute; bottom: 0; left: 0; right: 0; height: 100%;
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  transition: bottom 0.15s ease-out;
+  /* 用 transform 而非 bottom 做弹出动画：合成器线程执行，12 只并发不触发 layout */
+  transform: translateY(110%);
+  transition: transform 0.15s ease-out;
+  will-change: transform;
 }
-.mole.rising, .mole.up { bottom: 0; }
-.mole.hit { bottom: -100%; transition: bottom 0.25s ease-in; }
-.mole.escaped { bottom: -100%; transition: bottom 0.25s ease-in; }
+.mole.rising, .mole.up { transform: translateY(0); }
+.mole.hit { transform: translateY(110%); transition: transform 0.25s ease-in; }
+.mole.escaped { transform: translateY(110%); transition: transform 0.25s ease-in; }
 .mole .face { font-size: clamp(28px, 9vw, 44px); line-height: 1; }
 .mole img.face { width: clamp(34px, 10vw, 52px); height: clamp(34px, 10vw, 52px); border-radius: 50%; object-fit: cover; border: 2px solid #fff; }
 .mole.hit .face { filter: grayscale(0.6); transform: rotate(20deg); }
@@ -192,3 +195,12 @@ input[type='text'] {
   font-size: 11px; padding: 8px; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 220px;
 }
 .debug-panel button { padding: 2px 8px; font-size: 11px; background: #444; box-shadow: none; color: #0f0; }
+
+/* ── 无障碍：动效降级 ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

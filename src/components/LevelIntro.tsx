@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Dispatch } from 'react'
 import type { Action, GameState } from '../core/types'
-import { ATTEMPTS_PER_LEVEL, LEVELS, simultaneousMoles } from '../config/levels'
+import { ATTEMPTS_PER_LEVEL, LEVELS, LEVEL_COUNT, simultaneousMoles } from '../config/levels'
 
 const COUNTDOWN_SECONDS = 3
 const COUNTDOWN_INTERVAL_MS = 1000
@@ -29,7 +29,7 @@ export function LevelIntro({ state, dispatch }: Props) {
 
   return (
     <div className="intro">
-      <div>第 {level.level} 关 / 共 5 关</div>
+      <div>第 {level.level} 关 / 共 {LEVEL_COUNT} 关</div>
       <div className="level-name">{level.title}</div>
       <div className="params">
         同屏地鼠 {simultaneousMoles(state.config.baseMoleCount, level)} 只<br />

@@ -7,10 +7,12 @@ import { uid } from '../core/uid'
 interface Props {
   profiles: readonly MoleProfile[]
   onChange: (profiles: MoleProfile[]) => void
+  /** 头像压缩完成后按 id 上报，由父组件函数式合成，避免闭包旧档案覆盖并发编辑 */
+  onAvatarReady: (id: string, avatarDataUrl: string) => void
   onNotify: (message: string) => void
 }
 
-export function ProfileEditor({ profiles, onChange, onNotify }: Props) {
+export function ProfileEditor({ profiles, onChange, onAvatarReady, onNotify }: Props) {
   const addProfile = () => {
     if (profiles.length >= MAX_PROFILES) return
     onChange([...profiles, { id: uid('profile'), name: '' }])
@@ -34,11 +36,7 @@ export function ProfileEditor({ profiles, onChange, onNotify }: Props) {
     if (file === undefined) return
     try {
       const avatarDataUrl = await compressImage(file)
-      onChange(
-        profiles.map((profile) =>
-          profile.id === id ? { ...profile, avatarDataUrl } : profile,
-        ),
-      )
+      onAvatarReady(id, avatarDataUrl)
     } catch (error) {
       onNotify(error instanceof Error ? error.message : '头像上传失败')
     }
@@ -46,9 +44,15 @@ export function ProfileEditor({ profiles, onChange, onNotify }: Props) {
 
   return (
     <div className="profile-grid">
-      {profiles.map((profile) => (
+      {profiles.map((profile, index) => (
         <div className="profile-card" key={profile.id}>
-          <button className="remove" aria-label="删除档案" onClick={() => removeProfile(profile.id)}>✕</button>
+          <button
+            className="remove"
+            aria-label={`删除档案 ${profile.name || index + 1}`}
+            onClick={() => removeProfile(profile.id)}
+          >
+            ✕
+          </button>
           <label className="avatar">
             {profile.avatarDataUrl !== undefined ? (
               <img src={profile.avatarDataUrl} alt={profile.name || '头像'} />

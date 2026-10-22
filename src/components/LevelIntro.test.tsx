@@ -33,3 +33,16 @@ test('3 秒倒计时后派发 BEGIN_LEVEL', () => {
   act(() => { vi.advanceTimersByTime(1000) })
   expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'BEGIN_LEVEL' }))
 })
+
+test('倒计时中途卸载后不再派发 BEGIN_LEVEL', () => {
+  const dispatch = vi.fn()
+  const { unmount } = render(
+    <LevelIntro state={introState(0, 3)} dispatch={dispatch as unknown as Dispatch<Action>} />,
+  )
+  act(() => { vi.advanceTimersByTime(1000) })
+  expect(screen.getByText('2')).toBeInTheDocument()
+  unmount()
+  // 卸载后推进超过剩余倒计时：定时器应已被 cleanup 清除，无派发、无 act 警告
+  act(() => { vi.advanceTimersByTime(5000) })
+  expect(dispatch).not.toHaveBeenCalled()
+})

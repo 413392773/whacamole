@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Dispatch } from 'react'
 import type { Action, GameConfig, MoleProfile } from '../core/types'
 import {
@@ -10,6 +10,9 @@ import {
 import { saveConfig } from '../storage/profileStorage'
 import { ProfileEditor } from './ProfileEditor'
 
+const TOAST_DURATION_MS = 2500
+const STORAGE_UNAVAILABLE_MESSAGE = '本地存储不可用，本次定制不会被保存'
+
 interface Props {
   initialConfig: GameConfig
   dispatch: Dispatch<Action>
@@ -18,22 +21,54 @@ interface Props {
 export function SetupScreen({ initialConfig, dispatch }: Props) {
   const [config, setConfig] = useState<GameConfig>(initialConfig)
   const [toast, setToast] = useState<string | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
 
   const notify = (message: string) => {
     setToast(message)
-    window.setTimeout(() => setToast(null), 2500)
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null
+      setToast(null)
+    }, TOAST_DURATION_MS)
   }
 
-  const update = (patch: Partial<GameConfig>) => {
-    const next = { ...config, ...patch }
-    setConfig(next)
-    if (!saveConfig(next)) notify('本地存储不可用，本次定制不会被保存')
+  // 卸载时清理未触发的 toast 定时器
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  // 函数式更新：异步回调（头像压缩完成）与并发编辑不再互相覆盖
+  const update = (updater: (prev: GameConfig) => GameConfig) => {
+    setConfig(updater)
+  }
+
+  // config 变更后统一持久化；跳过初始值（identity 比较），保持"仅变更时写存储"语义
+  useEffect(() => {
+    if (config === initialConfig) return
+    if (!saveConfig(config)) notify(STORAGE_UNAVAILABLE_MESSAGE)
+  }, [config, initialConfig])
+
+  const handleProfilesChange = (profiles: MoleProfile[]) => {
+    update((prev) => ({ ...prev, profiles }))
+  }
+
+  // 只按 id 合成头像：档案若已被并发删除，map 无命中，天然安全
+  const handleAvatarReady = (id: string, avatarDataUrl: string) => {
+    update((prev) => ({
+      ...prev,
+      profiles: prev.profiles.map((profile) =>
+        profile.id === id ? { ...profile, avatarDataUrl } : profile,
+      ),
+    }))
   }
 
   const startGame = () => {
     const playerName = config.playerName.trim() || DEFAULT_PLAYER_NAME
     const finalConfig: GameConfig = { ...config, playerName }
     setConfig(finalConfig)
+    // 即将卸载转场，持久化 effect 可能来不及运行，此处显式保存
     saveConfig(finalConfig)
     dispatch({ type: 'START_GAME', config: finalConfig })
   }
@@ -51,7 +86,7 @@ export function SetupScreen({ initialConfig, dispatch }: Props) {
           value={config.playerName}
           maxLength={MAX_PLAYER_NAME_LENGTH}
           placeholder={DEFAULT_PLAYER_NAME}
-          onChange={(event) => update({ playerName: event.target.value })}
+          onChange={(event) => update((prev) => ({ ...prev, playerName: event.target.value }))}
         />
       </div>
 
@@ -65,7 +100,9 @@ export function SetupScreen({ initialConfig, dispatch }: Props) {
           min={MIN_BASE_MOLE_COUNT}
           max={MAX_BASE_MOLE_COUNT}
           value={config.baseMoleCount}
-          onChange={(event) => update({ baseMoleCount: Number(event.target.value) })}
+          onChange={(event) =>
+            update((prev) => ({ ...prev, baseMoleCount: Number(event.target.value) }))
+          }
         />
         {config.baseMoleCount === MAX_BASE_MOLE_COUNT && (
           <div className="hardcore-warn">⚠️ 硬核模式：第 5 关将满屏 12 只地鼠！</div>
@@ -76,7 +113,8 @@ export function SetupScreen({ initialConfig, dispatch }: Props) {
         <span className="field-label">地鼠档案（头像 + 名字，可不填用内置头像）</span>
         <ProfileEditor
           profiles={config.profiles}
-          onChange={(profiles: MoleProfile[]) => update({ profiles })}
+          onChange={handleProfilesChange}
+          onAvatarReady={handleAvatarReady}
           onNotify={notify}
         />
       </div>
