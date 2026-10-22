@@ -1,7 +1,7 @@
 export interface Title {
-  emoji: string
-  name: string
-  quote: string
+  readonly emoji: string
+  readonly name: string
+  readonly quote: string
 }
 
 export const TITLES: readonly Title[] = [

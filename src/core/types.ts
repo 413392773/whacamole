@@ -14,13 +14,13 @@ export interface GameConfig {
 }
 
 export interface LevelConfig {
-  level: number
-  title: string
-  multiplier: number
-  durationMs: number
-  stayMs: number
-  spawnIntervalMs: number
-  accuracyTarget: number
+  readonly level: number
+  readonly title: string
+  readonly multiplier: number
+  readonly durationMs: number
+  readonly stayMs: number
+  readonly spawnIntervalMs: number
+  readonly accuracyTarget: number
 }
 
 export type MoleState = 'rising' | 'up' | 'hit' | 'escaped'
