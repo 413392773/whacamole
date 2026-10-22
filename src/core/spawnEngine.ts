@@ -2,6 +2,10 @@ import type { LevelConfig, Mole, MoleProfile } from './types'
 
 export const RISE_DURATION_MS = 150
 export const RESOLVE_DELAY_MS = 300
+// 公平性护栏：地鼠从冒出到关卡结束至少需要的反应窗口（毫秒），
+// 晚于 deadline（关卡结束 - MIN_REACTION_MS）的冒出计划不再执行，
+// 避免终局"幽灵地鼠"零反应时间必漏、稀释命中率
+export const MIN_REACTION_MS = 300
 const MAX_SPAWN_STEPS_PER_TICK = 50
 
 export interface SpawnSnapshot {
@@ -46,6 +50,7 @@ export function tickSpawns(
   holeCount: number,
   profiles: readonly MoleProfile[],
   random: () => number,
+  spawnDeadline: number = Infinity,
 ): SpawnSnapshot {
   let newEscapes = 0
   const advanced = snapshot.moles.map((mole) => {
@@ -61,7 +66,7 @@ export function tickSpawns(
   let spawned = snapshot.spawned
   let moles = current
   let steps = 0
-  while (nextSpawnAt <= now && steps < MAX_SPAWN_STEPS_PER_TICK) {
+  while (nextSpawnAt <= now && nextSpawnAt <= spawnDeadline && steps < MAX_SPAWN_STEPS_PER_TICK) {
     steps += 1
     const activeCount = moles.filter(
       (mole) => mole.state === 'rising' || mole.state === 'up',

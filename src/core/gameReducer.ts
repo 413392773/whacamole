@@ -1,10 +1,13 @@
 import { ATTEMPTS_PER_LEVEL, HOLE_COUNT, LEVELS, simultaneousMoles } from '../config/levels'
 import { getEffectiveProfiles } from './profiles'
 import { accuracy, hasPassed, hitScore } from './scoring'
-import { tickSpawns } from './spawnEngine'
+import { MIN_REACTION_MS, tickSpawns } from './spawnEngine'
 import type { Action, GameConfig, GameState, LevelConfig, LevelStats } from './types'
 
-export function emptyStats(): LevelStats {
+// 调试用一键通关的保底总分：低于该值时抬到此值，确保证书页展示合理
+const DEBUG_CLEAR_ALL_MIN_SCORE = 1500
+
+function emptyStats(): LevelStats {
   return { hits: 0, spawned: 0, misses: 0, score: 0, maxCombo: 0, accuracy: 0 }
 }
 
@@ -91,6 +94,7 @@ export function createGameReducer(random: () => number) {
           HOLE_COUNT,
           getEffectiveProfiles(state.config),
           random,
+          state.levelStartAt + level.durationMs - MIN_REACTION_MS,
         )
         const nextState: GameState = {
           ...state,
@@ -160,7 +164,7 @@ export function createGameReducer(random: () => number) {
           screen: 'certificate',
           clearedLevels: LEVELS.length,
           levelAccuracies: LEVELS.map(() => 1),
-          totalScore: Math.max(state.totalScore, 1500),
+          totalScore: Math.max(state.totalScore, DEBUG_CLEAR_ALL_MIN_SCORE),
         }
 
       default:

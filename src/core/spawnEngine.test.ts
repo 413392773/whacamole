@@ -105,6 +105,24 @@ test('profiles 为空时不冒头也不崩溃', () => {
   expect(s.nextSpawnAt).toBe(500)
 })
 
+test('nextSpawnAt 晚于 spawnDeadline 时不冒新地鼠，已有地鼠仍正常推进/escaped', () => {
+  const s0 = tick(emptySnapshot(0), 0) // t=0 冒 1 只，nextSpawnAt=500
+  // deadline=400 < nextSpawnAt=500 → 终局护栏生效，不再冒新地鼠
+  const s1 = tickSpawns(s0, LEVEL.stayMs, LEVEL, 2, 12, PROFILES, random, 400)
+  expect(s1.spawned).toBe(1)
+  expect(s1.nextSpawnAt).toBe(500)
+  // 已冒出地鼠的状态推进照常：elapsed=stayMs → escaped 并计入 misses
+  expect(s1.moles.find((m) => m.id === s0.moles[0].id)?.state).toBe('escaped')
+  expect(s1.misses).toBe(1)
+})
+
+test('nextSpawnAt 恰好等于 spawnDeadline 时照常冒出（边界含等号）', () => {
+  const s0 = tick(emptySnapshot(0), 0)
+  const s1 = tickSpawns(s0, 700, LEVEL, 2, 12, PROFILES, random, 500)
+  expect(s1.spawned).toBe(2)
+  expect(s1.nextSpawnAt).toBe(1000)
+})
+
 test('random 返回 1 时索引 clamp 不越界', () => {
   const s = tickSpawns(emptySnapshot(0), 0, LEVEL, 2, 12, PROFILES, () => 1)
   expect(s.moles).toHaveLength(1)

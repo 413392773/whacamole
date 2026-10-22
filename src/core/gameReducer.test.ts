@@ -70,10 +70,11 @@ test('WHIFF 清空 combo，不影响分数', () => {
 
 test('倒计时结束达标：进入结算页，clearedLevels+1，总分累计', () => {
   let s = playing(0, 0)
-  // 构造确定性残局：预置 5 中/5 冒，末刻再冒 1 只不敲 → 命中率 5/6 ≥ 30%
+  // 构造确定性残局：预置 5 中/5 冒；nextSpawnAt 在护栏 deadline（durationMs-300）之前，
+  // 终局 tick 正常再冒 1 只不敲（有 ≥300ms 反应窗口）→ 命中率 5/6 ≥ 30%
   s = {
     ...s,
-    nextSpawnAt: LEVELS[0].durationMs - 50,
+    nextSpawnAt: LEVELS[0].durationMs - 500,
     stats: { ...s.stats, hits: 5, spawned: 5, score: 50 },
   }
   s = reduce(s, { type: 'TICK', now: LEVELS[0].durationMs })
@@ -83,6 +84,26 @@ test('倒计时结束达标：进入结算页，clearedLevels+1，总分累计',
   expect(s.totalScore).toBe(50)
   expect(s.levelAccuracies).toHaveLength(1)
   expect(s.levelAccuracies[0]).toBeCloseTo(5 / 6)
+  // 钉住 finishLevel 漏计逻辑：终局未解决地鼠计入 misses，accuracy 精确为 hits/spawned
+  expect(s.stats.misses).toBe(1)
+  expect(s.stats.accuracy).toBe(5 / 6)
+})
+
+test('终局幽灵冒出护栏：deadline 内的 nextSpawnAt 不再冒出稀释命中率', () => {
+  let s = playing(0, 0)
+  // nextSpawnAt=durationMs-50 晚于护栏 deadline（durationMs-MIN_REACTION_MS）→ 被拦截：
+  // 该地鼠若冒出玩家零反应时间必漏，不应计入 spawned/misses
+  s = {
+    ...s,
+    nextSpawnAt: LEVELS[0].durationMs - 50,
+    stats: { ...s.stats, hits: 5, spawned: 5, score: 50 },
+  }
+  s = reduce(s, { type: 'TICK', now: LEVELS[0].durationMs })
+  expect(s.screen).toBe('result')
+  expect(s.lastLevelPassed).toBe(true)
+  expect(s.stats.spawned).toBe(5)
+  expect(s.stats.misses).toBe(0)
+  expect(s.stats.accuracy).toBe(1)
 })
 
 test('倒计时结束未达标且有剩余机会：结算页可重试，机会−1', () => {
