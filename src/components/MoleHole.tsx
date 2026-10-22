@@ -9,7 +9,7 @@ interface Props {
   now: number
 }
 
-function isActive(mole: Mole | undefined): boolean {
+function isActive(mole: Mole | undefined): mole is Mole {
   return mole !== undefined && (mole.state === 'rising' || mole.state === 'up')
 }
 
@@ -18,7 +18,7 @@ export function MoleHole({ holeIndex, mole, profiles, dispatch, now }: Props) {
 
   const handlePointerDown = () => {
     if (isActive(mole)) {
-      dispatch({ type: 'WHACK', moleId: mole!.id, now })
+      dispatch({ type: 'WHACK', moleId: mole.id, now })
     } else {
       dispatch({ type: 'WHIFF' })
     }

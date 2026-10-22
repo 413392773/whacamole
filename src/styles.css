@@ -117,6 +117,8 @@ input[type='text'] {
   position: relative;
   aspect-ratio: 1 / 0.86;
   display: flex; align-items: flex-end; justify-content: center;
+  /* 防移动端快速滑动时浏览器平移手势取消 pointer 事件导致偶发点不中 */
+  touch-action: none;
 }
 .hole .dirt {
   position: absolute; bottom: 0; left: 0; right: 0; height: 34%;

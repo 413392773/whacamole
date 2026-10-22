@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Dispatch } from 'react'
 import type { Action, GameState } from '../core/types'
 import { ATTEMPTS_PER_LEVEL, LEVELS } from '../config/levels'
@@ -15,14 +15,20 @@ interface Props {
 export function LevelResult({ state, dispatch }: Props) {
   const level = LEVELS[state.levelIndex]
   const passed = state.lastLevelPassed
+  // StrictMode dev 下 effect 双执行会重复播放，用 ref 守卫确保每次挂载至多一次
+  const hasPlayedRef = useRef(false)
 
   useEffect(() => {
+    if (hasPlayedRef.current) return
+    hasPlayedRef.current = true
     playSound(passed ? 'pass' : 'fail')
   }, [passed])
 
+  // round 而非 ceil：消除浮点差略高于整数时的差一错误（如 (0.8-0.7)*100=10.000…9 → 11）；
+  // 未达标时差距至少显示 1%，与命中率取整显示保持一致
   const gapPercent = Math.max(
-    0,
-    Math.ceil((level.accuracyTarget - state.stats.accuracy) * 100),
+    1,
+    Math.round((level.accuracyTarget - state.stats.accuracy) * 100),
   )
   const hearts =
     '❤️'.repeat(state.attemptsLeft) + '🖤'.repeat(ATTEMPTS_PER_LEVEL - state.attemptsLeft)
