@@ -10,7 +10,7 @@ const CANVAS_WIDTH = 1200
 const CANVAS_HEIGHT = 850
 const REVOKE_OBJECT_URL_DELAY_MS = 1000
 const FILE_NAME_FALLBACK = '证书'
-// Windows/Unix 文件名非法字符 + C0/C1 控制字符
+// Windows/Unix 文件名非法字符 + C0 控制字符与 DEL
 const UNSAFE_FILE_NAME_CHARS = /[/\\:*?"<>|\u0000-\u001f\u007f]/g
 
 export function sanitizeFileName(name: string): string {

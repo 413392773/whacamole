@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Dispatch } from 'react'
 import type { Action, GameState } from '../core/types'
 import { LEVELS } from '../config/levels'
@@ -13,10 +13,15 @@ interface Props {
 export function DebugPanel({ state, dispatch }: Props) {
   const [isGodMode, setIsGodMode] = useState(false)
 
+  // ref 持有最新 moles：真实对局每 rAF 帧 TICK 都产生新 moles 数组引用，
+  // 若把 state.moles 放进 effect deps，interval 每 ~16ms 被重建，200ms 回调永远等不满
+  const molesRef = useRef(state.moles)
+  molesRef.current = state.moles
+
   useEffect(() => {
     if (!isGodMode || state.screen !== 'playing') return
     const timer = window.setInterval(() => {
-      const target = state.moles.find(
+      const target = molesRef.current.find(
         (mole) => mole.state === 'rising' || mole.state === 'up',
       )
       if (target !== undefined) {
@@ -24,7 +29,7 @@ export function DebugPanel({ state, dispatch }: Props) {
       }
     }, GOD_MODE_INTERVAL_MS)
     return () => window.clearInterval(timer)
-  }, [isGodMode, state.screen, state.moles, dispatch])
+  }, [isGodMode, state.screen, dispatch])
 
   return (
     <div className="debug-panel">
