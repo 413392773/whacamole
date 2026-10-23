@@ -8,6 +8,7 @@ import { playSound } from '../hooks/useSound'
 
 const CANVAS_WIDTH = 1200
 const CANVAS_HEIGHT = 850
+const REVOKE_OBJECT_URL_DELAY_MS = 1000
 
 export interface CertificateData {
   playerName: string
@@ -31,16 +32,7 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
-export async function drawCertificate(
-  canvas: HTMLCanvasElement | null,
-  data: CertificateData,
-): Promise<void> {
-  if (canvas === null) return
-  const ctx = canvas.getContext('2d')
-  if (ctx === null) return
-
-  const { playerName, dateText, avgAccuracy, rank, totalScore, profiles } = data
-
+function drawCertificateBackground(ctx: CanvasRenderingContext2D): void {
   const background = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT)
   background.addColorStop(0, '#fffdf5')
   background.addColorStop(1, '#fdf3d7')
@@ -52,6 +44,10 @@ export async function drawCertificate(
   ctx.strokeRect(24, 24, CANVAS_WIDTH - 48, CANVAS_HEIGHT - 48)
   ctx.lineWidth = 4
   ctx.strokeRect(48, 48, CANVAS_WIDTH - 96, CANVAS_HEIGHT - 96)
+}
+
+function drawCertificateTexts(ctx: CanvasRenderingContext2D, data: CertificateData): void {
+  const { playerName, dateText, avgAccuracy, rank, totalScore } = data
 
   ctx.textAlign = 'center'
   ctx.fillStyle = '#8a6d1a'
@@ -70,7 +66,9 @@ export async function drawCertificate(
   )
   ctx.fillText('完成欢乐打地鼠五关挑战，特发此证', CANVAS_WIDTH / 2, 420)
   ctx.fillText(`总得分 ${totalScore} 分 · 评级 ${rank.grade}「${rank.name}」`, CANVAS_WIDTH / 2, 480)
+}
 
+function drawRankSeal(ctx: CanvasRenderingContext2D, rank: Rank): void {
   ctx.beginPath()
   ctx.arc(CANVAS_WIDTH / 2, 620, 90, 0, Math.PI * 2)
   ctx.strokeStyle = '#e63946'
@@ -79,7 +77,9 @@ export async function drawCertificate(
   ctx.fillStyle = '#e63946'
   ctx.font = 'bold 90px serif'
   ctx.fillText(rank.grade, CANVAS_WIDTH / 2, 655)
+}
 
+async function drawAvatarRow(ctx: CanvasRenderingContext2D, profiles: readonly MoleProfile[]): Promise<void> {
   const avatars = profiles.filter((profile) => profile.avatarDataUrl !== undefined)
   const images = (await Promise.all(avatars.map((p) => loadImage(p.avatarDataUrl!))))
     .filter((img): img is HTMLImageElement => img !== null)
@@ -97,6 +97,20 @@ export async function drawCertificate(
   }
 }
 
+export async function drawCertificate(
+  canvas: HTMLCanvasElement | null,
+  data: CertificateData,
+): Promise<void> {
+  if (canvas === null) return
+  const ctx = canvas.getContext('2d')
+  if (ctx === null) return
+
+  drawCertificateBackground(ctx)
+  drawCertificateTexts(ctx, data)
+  drawRankSeal(ctx, data.rank)
+  await drawAvatarRow(ctx, data.profiles)
+}
+
 interface Props {
   state: GameState
   dispatch: Dispatch<Action>
@@ -110,10 +124,17 @@ export function Certificate({ state, dispatch }: Props) {
   const rank = getRank(avgAccuracy)
   const dateText = formatCertificateDate(new Date())
 
+  // StrictMode dev 下 effect 双执行会重复播放，用 ref 守卫确保每次挂载至多一次
+  const hasPlayedRef = useRef(false)
+
   useEffect(() => {
+    if (hasPlayedRef.current) return
+    hasPlayedRef.current = true
     playSound('victory')
   }, [])
 
+  // deps 用原始值：rank/dateText 每轮渲染都是新对象/新字符串来源，
+  // 依赖对象身份会导致 setHint 等无关渲染触发全量重绘与头像重载
   useEffect(() => {
     void drawCertificate(canvasRef.current, {
       playerName: state.config.playerName,
@@ -123,7 +144,15 @@ export function Certificate({ state, dispatch }: Props) {
       totalScore: state.totalScore,
       profiles: state.config.profiles,
     })
-  }, [state, dateText, avgAccuracy, rank])
+  }, [
+    state.config.playerName,
+    state.config.profiles,
+    state.totalScore,
+    dateText,
+    avgAccuracy,
+    rank.grade,
+    rank.name,
+  ])
 
   const savePng = () => {
     const canvas = canvasRef.current
@@ -140,9 +169,13 @@ export function Certificate({ state, dispatch }: Props) {
       const link = document.createElement('a')
       link.href = url
       link.download = `荣誉证书-${state.config.playerName}.png`
+      // Firefox 要求 anchor 在文档内才能触发下载
+      document.body.appendChild(link)
       link.click()
-      URL.revokeObjectURL(url)
-      setHint('已保存！手机上也可长按证书图片存储')
+      link.remove()
+      // iOS Safari 下同步 revoke 可能导致下载失败，延迟释放
+      window.setTimeout(() => URL.revokeObjectURL(url), REVOKE_OBJECT_URL_DELAY_MS)
+      setHint('已保存！手机若未弹出下载，可截屏保存证书')
     }, 'image/png')
   }
 
