@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { Dispatch } from 'react'
-import { Certificate, formatCertificateDate } from './Certificate'
+import { Certificate, formatCertificateDate, sanitizeFileName } from './Certificate'
 import { createInitialState } from '../core/gameReducer'
 import { playSound } from '../hooks/useSound'
 import type { Action, GameConfig, GameState } from '../core/types'
@@ -102,6 +102,53 @@ test('toBlob 返回 null 时提示导出失败', () => {
   render(<Certificate state={clearState([1, 1, 1, 1, 1])} dispatch={vi.fn() as unknown as Dispatch<Action>} />)
   fireEvent.click(screen.getByRole('button', { name: '保存证书 PNG' }))
   expect(screen.getByText(/导出失败，请截屏保存/)).toBeInTheDocument()
+})
+
+// —— 下载文件名清洗（M-6）——
+
+function mockPngExport() {
+  vi.useFakeTimers()
+  URL.createObjectURL = vi.fn(() => 'blob:mock')
+  URL.revokeObjectURL = vi.fn()
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, cb) {
+    cb(new Blob(['fake'], { type: 'image/png' }))
+  })
+  return vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+}
+
+function clickSaveAndGetDownloadName(state: GameState): string {
+  const anchorClick = mockPngExport()
+  render(<Certificate state={state} dispatch={vi.fn() as unknown as Dispatch<Action>} />)
+  fireEvent.click(screen.getByRole('button', { name: '保存证书 PNG' }))
+  const anchor = anchorClick.mock.instances[0] as unknown as HTMLAnchorElement
+  return anchor.download
+}
+
+test('sanitizeFileName 去除非法字符与控制字符并 trim', () => {
+  expect(sanitizeFileName('  测试侠:a/b\\c*d?e"f<g>h|i\u0000\u001f  ')).toBe('测试侠abcdefghi')
+  expect(sanitizeFileName('正常昵称')).toBe('正常昵称')
+})
+
+test('sanitizeFileName 对空串、纯空白、纯非法字符回退为「证书」', () => {
+  expect(sanitizeFileName('')).toBe('证书')
+  expect(sanitizeFileName('   ')).toBe('证书')
+  expect(sanitizeFileName('///')).toBe('证书')
+})
+
+test('下载文件名清洗特殊字符昵称', () => {
+  const state: GameState = {
+    ...clearState([1, 1, 1, 1, 1]),
+    config: { ...CONFIG, playerName: ' 张/三:*?"<>| ' },
+  }
+  expect(clickSaveAndGetDownloadName(state)).toBe('荣誉证书-张三.png')
+})
+
+test('下载文件名对纯空白昵称回退为「证书」', () => {
+  const state: GameState = {
+    ...clearState([1, 1, 1, 1, 1]),
+    config: { ...CONFIG, playerName: '   ' },
+  }
+  expect(clickSaveAndGetDownloadName(state)).toBe('荣誉证书-证书.png')
 })
 
 test('再来一局派发 RESTART', () => {

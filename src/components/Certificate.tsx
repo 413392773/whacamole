@@ -9,6 +9,14 @@ import { playSound } from '../hooks/useSound'
 const CANVAS_WIDTH = 1200
 const CANVAS_HEIGHT = 850
 const REVOKE_OBJECT_URL_DELAY_MS = 1000
+const FILE_NAME_FALLBACK = '证书'
+// Windows/Unix 文件名非法字符 + C0/C1 控制字符
+const UNSAFE_FILE_NAME_CHARS = /[/\\:*?"<>|\u0000-\u001f\u007f]/g
+
+export function sanitizeFileName(name: string): string {
+  const cleaned = name.replace(UNSAFE_FILE_NAME_CHARS, '').trim()
+  return cleaned === '' ? FILE_NAME_FALLBACK : cleaned
+}
 
 export interface CertificateData {
   playerName: string
@@ -168,7 +176,7 @@ export function Certificate({ state, dispatch }: Props) {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `荣誉证书-${state.config.playerName}.png`
+      link.download = `荣誉证书-${sanitizeFileName(state.config.playerName)}.png`
       // Firefox 要求 anchor 在文档内才能触发下载
       document.body.appendChild(link)
       link.click()

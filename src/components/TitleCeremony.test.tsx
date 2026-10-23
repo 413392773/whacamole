@@ -1,7 +1,9 @@
+import { StrictMode } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { Dispatch } from 'react'
 import { TitleCeremony } from './TitleCeremony'
 import { createInitialState } from '../core/gameReducer'
+import { playSound } from '../hooks/useSound'
 import type { Action, GameConfig, GameState } from '../core/types'
 
 const CONFIG: GameConfig = { playerName: '测试侠', baseMoleCount: 2, profiles: [] }
@@ -11,6 +13,11 @@ function gameoverState(clearedLevels: number): GameState {
 }
 
 vi.mock('../hooks/useSound', () => ({ playSound: vi.fn() }))
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.clearAllMocks()
+})
 
 test('通过 0 关显示「初入江湖」与玩家昵称', () => {
   render(<TitleCeremony state={gameoverState(0)} dispatch={vi.fn() as unknown as Dispatch<Action>} />)
@@ -34,4 +41,17 @@ test('再来一局派发 RESTART', () => {
   render(<TitleCeremony state={gameoverState(2)} dispatch={dispatch as unknown as Dispatch<Action>} />)
   fireEvent.click(screen.getByRole('button', { name: '再来一局' }))
   expect(dispatch).toHaveBeenCalledWith({ type: 'RESTART' })
+})
+
+test('盖章音效延迟 300ms 播放且 StrictMode 下至多一次', () => {
+  vi.useFakeTimers()
+  render(
+    <StrictMode>
+      <TitleCeremony state={gameoverState(2)} dispatch={vi.fn() as unknown as Dispatch<Action>} />
+    </StrictMode>,
+  )
+  expect(playSound).not.toHaveBeenCalled()
+  vi.advanceTimersByTime(300)
+  expect(playSound).toHaveBeenCalledTimes(1)
+  expect(playSound).toHaveBeenCalledWith('stamp')
 })
