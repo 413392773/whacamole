@@ -1,7 +1,8 @@
 import { StrictMode } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { Dispatch } from 'react'
-import { Certificate, formatCertificateDate, sanitizeFileName } from './Certificate'
+import { Certificate, drawCertificate, formatCertificateDate, sanitizeFileName } from './Certificate'
+import { getRank } from '../config/titles'
 import { createInitialState } from '../core/gameReducer'
 import { playSound } from '../hooks/useSound'
 import type { Action, GameConfig, GameState } from '../core/types'
@@ -28,6 +29,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 test('日期格式化为 YYYY年M月D日', () => {
@@ -156,4 +158,105 @@ test('再来一局派发 RESTART', () => {
   render(<Certificate state={clearState([1, 1, 1, 1, 1])} dispatch={dispatch as unknown as Dispatch<Action>} />)
   fireEvent.click(screen.getByRole('button', { name: '再来一局' }))
   expect(dispatch).toHaveBeenCalledWith({ type: 'RESTART' })
+})
+
+// —— Canvas 绘制管线（补覆盖率：stub 2d 上下文验证绘制调用）——
+
+function stub2dContext() {
+  return {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    font: '',
+    textAlign: '',
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+    fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    fillText: vi.fn(),
+    beginPath: vi.fn(),
+    arc: vi.fn(),
+    stroke: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    clip: vi.fn(),
+    drawImage: vi.fn(),
+  }
+}
+
+test('drawCertificate 绘制背景边框、标题、玩家名、评级印章与头像行', async () => {
+  const ctx = stub2dContext()
+  const canvas = { getContext: vi.fn(() => ctx) } as unknown as HTMLCanvasElement
+  // jsdom 不加载图片：stub Image 让 onload 异步触发，走头像绘制分支
+  class FakeImage {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    src = ''
+    constructor() {
+      setTimeout(() => this.onload?.(), 0)
+    }
+  }
+  vi.stubGlobal('Image', FakeImage)
+
+  await drawCertificate(canvas, {
+    playerName: '测试侠',
+    dateText: '2026年10月22日',
+    avgAccuracy: 0.9,
+    rank: getRank(0.9),
+    totalScore: 1500,
+    profiles: [{ id: 'p1', name: '鼠鼠', avatarDataUrl: 'data:image/png;base64,fake' }],
+  })
+
+  const texts = ctx.fillText.mock.calls.map((call) => String(call[0]))
+  expect(texts).toContain('荣 誉 证 书')
+  expect(texts).toContain('侠士 测试侠')
+  expect(texts.some((t) => t.includes('于 2026年10月22日') && t.includes('平均命中率 90%'))).toBe(true)
+  expect(texts.some((t) => t.includes('总得分 1500 分') && t.includes('评级 S「鼠神降临」'))).toBe(true)
+  // 双层边框 + 渐变背景
+  expect(ctx.strokeRect).toHaveBeenCalledTimes(2)
+  expect(ctx.createLinearGradient).toHaveBeenCalledTimes(1)
+  // 评级印章圆弧与字母
+  expect(texts).toContain('S')
+  expect(ctx.arc).toHaveBeenCalled()
+  // 头像行：1 个头像被裁剪并绘制
+  expect(ctx.drawImage).toHaveBeenCalledTimes(1)
+  expect(ctx.clip).toHaveBeenCalledTimes(1)
+})
+
+test('drawCertificate 头像加载失败时跳过绘制且不崩溃', async () => {
+  const ctx = stub2dContext()
+  const canvas = { getContext: vi.fn(() => ctx) } as unknown as HTMLCanvasElement
+  class BrokenImage {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    src = ''
+    constructor() {
+      setTimeout(() => this.onerror?.(), 0)
+    }
+  }
+  vi.stubGlobal('Image', BrokenImage)
+
+  await expect(
+    drawCertificate(canvas, {
+      playerName: '测试侠',
+      dateText: '2026年10月22日',
+      avgAccuracy: 1,
+      rank: getRank(1),
+      totalScore: 1500,
+      profiles: [{ id: 'p1', name: '鼠鼠', avatarDataUrl: 'data:image/png;base64,broken' }],
+    }),
+  ).resolves.toBeUndefined()
+  expect(ctx.drawImage).not.toHaveBeenCalled()
+})
+
+test('drawCertificate 对 null canvas 或无 2d 上下文时静默返回', async () => {
+  await expect(
+    drawCertificate(null, {
+      playerName: 'x',
+      dateText: 'x',
+      avgAccuracy: 1,
+      rank: getRank(1),
+      totalScore: 0,
+      profiles: [],
+    }),
+  ).resolves.toBeUndefined()
 })

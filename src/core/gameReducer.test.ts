@@ -176,3 +176,27 @@ test('非 playing 状态下 TICK/WHACK 被忽略', () => {
   expect(reduce(intro, { type: 'TICK', now: 99999 })).toBe(intro)
   expect(reduce(intro, { type: 'WHACK', moleId: 1, now: 1 })).toBe(intro)
 })
+
+test('DEBUG_JUMP_LEVEL 越界钳制：99→末关，-1→首关，并重置机会进入引导页', () => {
+  const s0 = createInitialState(CONFIG)
+  const high = reduce(s0, { type: 'DEBUG_JUMP_LEVEL', levelIndex: 99 })
+  expect(high.screen).toBe('intro')
+  expect(high.levelIndex).toBe(LEVELS.length - 1)
+  expect(high.attemptsLeft).toBe(ATTEMPTS_PER_LEVEL)
+  const low = reduce(s0, { type: 'DEBUG_JUMP_LEVEL', levelIndex: -1 })
+  expect(low.screen).toBe('intro')
+  expect(low.levelIndex).toBe(0)
+  expect(low.attemptsLeft).toBe(ATTEMPTS_PER_LEVEL)
+})
+
+test('DEBUG_CLEAR_ALL 直达证书页：全通、满分命中率、总分不低于保底值', () => {
+  const s0 = createInitialState(CONFIG)
+  const cleared = reduce(s0, { type: 'DEBUG_CLEAR_ALL' })
+  expect(cleared.screen).toBe('certificate')
+  expect(cleared.clearedLevels).toBe(LEVELS.length)
+  expect(cleared.levelAccuracies).toEqual(LEVELS.map(() => 1))
+  expect(cleared.totalScore).toBeGreaterThanOrEqual(1500)
+  // 已有更高分时保留原总分
+  const rich = reduce({ ...s0, totalScore: 2300 }, { type: 'DEBUG_CLEAR_ALL' })
+  expect(rich.totalScore).toBe(2300)
+})
