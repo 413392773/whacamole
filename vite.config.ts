@@ -3,6 +3,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
+  // 相对路径 base：同一份构建产物可同时部署到
+  // GitHub Pages（/whacamole/ 子路径）和 Cloudflare Workers（根路径）
+  base: './',
   plugins: [react()],
   test: {
     environment: 'jsdom',
